@@ -6,6 +6,7 @@ import {dispatch, TASKS} from './pipeline.js';
 import * as chain from './chain.js';
 import {verifyWithWorld, localHumanhoodStub} from './world.js';
 import {readRecord} from './og.js';
+import { runAgentWorkflow } from './scraper.js';
 
 /**
  * Dependency-free HTTP layer. No framework: fewer moving parts is fewer things
@@ -41,6 +42,22 @@ const routes = [];
 const route = (method, pattern, handler) => routes.push({method, pattern, handler});
 
 // ───────────────────────────────────────── meta
+
+
+route('POST', /^\/api\/scrape\/?$/, async (_req, body) => {
+  const prompt = body.objective || body.prompt || body.url || body.topic;
+  if (!prompt) {
+    const err = new Error('A research objective, topic, or URL is required');
+    err.status = 400;
+    throw err;
+  }
+
+  const isUrl = prompt.startsWith('http://') || prompt.startsWith('https://');
+  return runAgentWorkflow({
+    startUrl: isUrl ? prompt : null,
+    objective: isUrl ? null : prompt,
+  });
+});
 
 route('GET', /^\/health$/, async () => ({
   ok: true,
