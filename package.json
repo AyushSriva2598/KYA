@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "KYA — Know Your Agent. Onchain identity, authority and reputation for autonomous AI agents.",
-  "packageManager": "pnpm@10.10.0",
+  "packageManager": "pnpm@12.3.4",
   "scripts": {
     "chain": "anvil --host 127.0.0.1 --port 8545 --chain-id 31337 --silent",
     "contracts:build": "forge build --root contracts",
@@ -19,5 +19,9 @@
   },
   "devDependencies": {
     "typescript": "5.6.3"
+  },
+  "dependencies": {
+    "@google/genai": "^2.21.0",
+    "api": "^7.0.2"
   }
 }

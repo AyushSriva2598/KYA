@@ -30,6 +30,16 @@ export const IconSearch = (p) => (
   </S>
 );
 
+export const IconRobot = (p) => (
+  <S {...p}>
+    <rect x="3" y="4" width="10" height="8" rx="2" />
+    <circle cx="6.5" cy="8" r="1" />
+    <circle cx="9.5" cy="8" r="1" />
+    <path d="M8 4V2" />
+    <path d="M6 10.5h4" />
+  </S>
+);
+
 export const IconCheck = (p) => (
   <S {...p}>
     <path d="M3 8.4 6.2 11.5 13 4.5" />
