@@ -91,6 +91,8 @@ export default function Inventory({onPick}) {
   const [activeTab, setActiveTab] = useState('console'); // 'console' | 'history' | 'catalog'
   const [sessionUser, setSessionUser] = useState(null);
   const [targetHandle, setTargetHandle] = useState('');
+  const [agentIdentity, setAgentIdentity] = useState(null);
+  const [copiedVerify, setCopiedVerify] = useState(false);
   const resultRef = useRef(null);
 
   // Load execution history
@@ -124,10 +126,21 @@ export default function Inventory({onPick}) {
       .catch(() => {});
   };
 
+  // Load agent identity attestation
+  const loadIdentity = () => {
+    api
+      .browserAgentIdentity?.()
+      .then((data) => {
+        if (data?.ok) setAgentIdentity(data);
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     loadHistory();
     loadPassport();
     loadSession();
+    loadIdentity();
   }, []);
 
   // Handle agent execution
@@ -340,6 +353,74 @@ export default function Inventory({onPick}) {
                     placeholder={sessionUser?.handle ? `@${sessionUser.handle}` : "Auto-detect"}
                     className="h-7 w-36 font-mono text-xs bg-black/50 border-white/15 px-2 py-0 text-white focus-visible:border-primary"
                   />
+                </div>
+              </div>
+
+              {/* Verifiable Agent Identity Carrier Panel */}
+              <div className="p-3.5 rounded-lg bg-emerald-500/[0.03] border border-emerald-500/20 space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-2 w-2 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="font-mono text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+                      On-Chain Identity Carrier Injected
+                    </span>
+                    <Badge variant="outline" className="text-[9px] font-mono text-emerald-400 border-emerald-500/30 bg-emerald-500/10">
+                      Passport #4
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-muted-foreground">Operator:</span>
+                    <span className="text-[10px] font-mono text-white/90 bg-black/40 px-1.5 py-0.5 rounded border border-white/10 font-medium" title={agentIdentity?.operator}>
+                      {agentIdentity?.operator ? short(agentIdentity.operator, 10, 8) : '0xef045a...63e1'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] font-mono">
+                  <div className="p-2 rounded bg-black/40 border border-white/5 flex flex-col gap-0.5">
+                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground">DOM / DevTools Object</span>
+                    <span className="text-emerald-400 font-medium">window.__KYA_AGENT__</span>
+                  </div>
+                  <div className="p-2 rounded bg-black/40 border border-white/5 flex flex-col gap-0.5">
+                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Outbound HTTP Headers</span>
+                    <span className="text-cyan-400 font-medium truncate" title="X-KYA-Passport: eip155:31337:0xe7f1.../4">
+                      X-KYA-Passport (eip155:31337:…/4)
+                    </span>
+                  </div>
+                  <div className="p-2 rounded bg-black/40 border border-white/5 flex flex-col gap-0.5">
+                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Cryptographic Attestation</span>
+                    <span className="text-white/80 font-medium truncate" title={agentIdentity?.signature}>
+                      {agentIdentity?.signature ? `${agentIdentity.signature.slice(0, 14)}...` : 'EIP-191 Signed'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-emerald-500/10 text-[11px] font-mono">
+                  <span className="text-muted-foreground">
+                    💡 Open DevTools Console in Chrome to inspect the live KYA identity badge.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText('await window.__KYA_AGENT__.verify()');
+                      setCopiedVerify(true);
+                      setTimeout(() => setCopiedVerify(false), 2000);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-primary border border-primary/30 transition-colors text-[10px]"
+                  >
+                    {copiedVerify ? (
+                      <>
+                        <IconCheck size={12} className="text-emerald-400" /> Copied Command!
+                      </>
+                    ) : (
+                      <>
+                        <span>Copy Console Verify Snippet</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 

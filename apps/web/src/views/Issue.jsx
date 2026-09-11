@@ -5,7 +5,7 @@ import {Card, CardContent, CardHeader} from '../components/ui/card';
 import {Button} from '../components/ui/button';
 import {Input} from '../components/ui/input';
 
-const ALL_CAPS = ['flight.quote', 'research', 'pay'];
+const ALL_CAPS = ['flight.quote', 'research', 'pay', 'browser.action', 'social.post', 'scrape.web'];
 
 export default function Issue({onPick, integrations}) {
   const [health, setHealth] = useState(null);

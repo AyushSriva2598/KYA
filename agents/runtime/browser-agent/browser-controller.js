@@ -2,6 +2,7 @@ import {chromium} from 'playwright';
 import {existsSync, readFileSync, writeFileSync} from 'node:fs';
 import {resolve, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {getAgentIdentity} from './agent-identity.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const defaultStoragePath = resolve(__dirname, '.storage', 'x-session.json');
@@ -48,9 +49,19 @@ export class BrowserController {
     this.page = null;
     this.isCdp = false;
     this.currentUser = getSavedUserInfo(storagePath);
+    this.identity = null;
   }
 
   async init() {
+    // 0. Load and cryptographically sign on-chain KYA Agent Identity
+    try {
+      this.identity = await getAgentIdentity();
+      console.log(`🪪 [BrowserController] Carrying KYA Identity: ${this.identity.passport.ensName} (#${this.identity.passport.agentId})`);
+      console.log(`   Operator: ${this.identity.operator} · Sig: ${this.identity.signature.slice(0, 18)}...`);
+    } catch (err) {
+      console.warn(`[BrowserController] Notice: Could not load agent identity: ${err.message}`);
+    }
+
     // 1. Check if user has Chrome already running with remote debugging
     const cdpAvailable = await checkCdpAvailable(this.cdpPort);
     if (cdpAvailable) {
@@ -62,6 +73,13 @@ export class BrowserController {
       // Reuse active X tab if present, else create new tab
       this.page = pages.find((p) => p.url().includes('x.com') || p.url().includes('twitter.com')) || (await this.context.newPage());
       this.isCdp = true;
+
+      // Inject identity into CDP session
+      if (this.identity) {
+        await this.context.setExtraHTTPHeaders(this.identity.headers).catch(() => {});
+        await this.context.addInitScript(this.identity.injectionScript).catch(() => {});
+        await this.page.evaluate(this.identity.injectionScript).catch(() => {});
+      }
       return this;
     }
 
@@ -84,6 +102,10 @@ export class BrowserController {
         'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     };
 
+    if (this.identity?.userAgentSuffix) {
+      contextOptions.userAgent = `${contextOptions.userAgent} ${this.identity.userAgentSuffix}`;
+    }
+
     if (!existsSync(this.storagePath)) {
       const extractorScript = resolve(__dirname, 'extract-chrome-session.py');
       if (existsSync(extractorScript)) {
@@ -104,6 +126,13 @@ export class BrowserController {
     }
 
     this.context = await this.browser.newContext(contextOptions);
+
+    // Inject identity into context (all pages & frames)
+    if (this.identity) {
+      await this.context.setExtraHTTPHeaders(this.identity.headers).catch(() => {});
+      await this.context.addInitScript(this.identity.injectionScript).catch(() => {});
+    }
+
     this.page = await this.context.newPage();
     return this;
   }
@@ -118,6 +147,9 @@ export class BrowserController {
       if (!this.page.url().includes(url)) {
         await this.page.goto(url, {waitUntil: 'commit', timeout: 15000}).catch(() => {});
       }
+    }
+    if (this.identity) {
+      await this.page.evaluate(this.identity.injectionScript).catch(() => {});
     }
     await this.page.waitForTimeout(2000);
   }

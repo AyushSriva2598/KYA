@@ -358,6 +358,63 @@ route('GET', /^\/api\/browser-agent\/session$/, async () => {
 });
 
 /**
+ * Returns current on-chain identity, cryptographic session attestation,
+ * and outbound verification metadata for the browser agent.
+ */
+route('GET', /^\/api\/browser-agent\/identity$/, async () => {
+  const {getAgentIdentity} = await import('../../../agents/runtime/browser-agent/agent-identity.js');
+  const identity = await getAgentIdentity();
+  return {
+    ok: true,
+    ...identity.identityData,
+    headers: identity.headers,
+    userAgentSuffix: identity.userAgentSuffix,
+  };
+});
+
+/**
+ * Cryptographically verifies an agent session attestation against the
+ * on-chain passport registry.
+ */
+route('POST', /^\/api\/browser-agent\/verify-identity$/, async (_req, body) => {
+  const {operator, signature, message, agentId = '4'} = body;
+  if (!operator || !signature || !message) {
+    const err = new Error('operator, signature, and message are required');
+    err.status = 400;
+    throw err;
+  }
+
+  const {verifyMessage} = await import('viem');
+  let validSig = false;
+  try {
+    validSig = await verifyMessage({address: operator, message, signature});
+  } catch {}
+
+  const client = kyaClient();
+  const passport = await client.passport(agentId).catch(() => null);
+  const operatorMatch = passport && (passport.operator || '').toLowerCase() === operator.toLowerCase();
+
+  return {
+    validSignature: validSig,
+    operatorMatch: Boolean(operatorMatch),
+    verified: Boolean(validSig && operatorMatch),
+    passport: passport
+      ? {
+          agentId: passport.agentId,
+          ensName: passport.ensName,
+          operator: passport.operator,
+          owner: passport.owner,
+          active: passport.active,
+          humanVerified: passport.humanVerified,
+          reputation: passport.reputation,
+          capabilities: passport.capabilities,
+        }
+      : null,
+    status: validSig && operatorMatch ? 'VERIFIED_ON_CHAIN' : 'VERIFICATION_FAILED',
+  };
+});
+
+/**
  * Serves real-time PNG screenshots captured during browser agent execution.
  */
 route('GET', /^\/api\/browser-agent\/screenshot\/([^/]+)\/([^/]+)$/, async (_req, _body, [runId, filename], _url, res) => {
