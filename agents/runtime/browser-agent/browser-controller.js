@@ -1,10 +1,23 @@
 import {chromium} from 'playwright';
-import {existsSync} from 'node:fs';
+import {existsSync, readFileSync, writeFileSync} from 'node:fs';
 import {resolve, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const defaultStoragePath = resolve(__dirname, '.storage', 'x-session.json');
+
+/**
+ * Reads any cached user account info from disk if available
+ */
+export function getSavedUserInfo(storagePath = defaultStoragePath) {
+  try {
+    const infoPath = resolve(dirname(storagePath), 'session-info.json');
+    if (existsSync(infoPath)) {
+      return JSON.parse(readFileSync(infoPath, 'utf8'));
+    }
+  } catch {}
+  return null;
+}
 
 /**
  * Check if Chrome DevTools Protocol is available on a port
@@ -34,6 +47,7 @@ export class BrowserController {
     this.context = null;
     this.page = null;
     this.isCdp = false;
+    this.currentUser = getSavedUserInfo(storagePath);
   }
 
   async init() {
@@ -233,6 +247,47 @@ export class BrowserController {
   async getUrl() {
     if (!this.page) return '';
     return this.page.url();
+  }
+
+  /**
+   * Dynamically detect the authenticated user's Twitter handle & name from the active DOM session.
+   * Works universally for ANY user logged in in their browser.
+   */
+  async getAuthenticatedUser() {
+    if (this.currentUser?.handle) return this.currentUser;
+    if (!this.page) return null;
+    try {
+      const user = await this.page.evaluate(() => {
+        // 1. Primary: Profile tab in Twitter left navigation
+        const profileLink = document.querySelector('a[data-testid="AppTabBar_Profile_Link"]');
+        const href = profileLink ? profileLink.getAttribute('href') : null;
+        const handleFromHref = href ? href.replace(/^\//, '').split('/')[0].split('?')[0] : null;
+
+        // 2. Secondary: Account switcher button in bottom-left
+        const switcher = document.querySelector('[data-testid="SideNav_AccountSwitcher_Button"]');
+        const switcherText = switcher ? switcher.innerText : '';
+        const match = switcherText.match(/@([A-Za-z0-9_]+)/);
+        const handleFromSwitcher = match ? match[1] : null;
+
+        // Display name
+        const nameEl = switcher ? switcher.querySelector('div[dir="ltr"]') : null;
+        const displayName = nameEl ? nameEl.innerText.trim() : handleFromHref;
+
+        const handle = handleFromHref || handleFromSwitcher;
+        return handle ? {handle, displayName: displayName || handle} : null;
+      });
+
+      if (user && user.handle) {
+        this.currentUser = user;
+        try {
+          const infoPath = resolve(dirname(this.storagePath), 'session-info.json');
+          writeFileSync(infoPath, JSON.stringify(user, null, 2), 'utf8');
+        } catch {}
+      }
+      return this.currentUser;
+    } catch {
+      return null;
+    }
   }
 
   async waitForSelector(selector, timeout = 10000) {

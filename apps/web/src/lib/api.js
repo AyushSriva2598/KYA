@@ -46,6 +46,7 @@ export const api = {
   createAgent: (payload) => call('/api/agents', payload),
   runBrowserAgent: (payload) => call('/api/browser-agent/run', payload),
   browserAgentHistory: () => call('/api/browser-agent/history'),
+  browserAgentSession: () => call('/api/browser-agent/session'),
   browserAgentScreenshotUrl: (runId, filename) => {
     const baseUrl = import.meta.env.VITE_API_URL || '';
     const cleanBase = baseUrl ? baseUrl.replace(/\/$/, '') : '';

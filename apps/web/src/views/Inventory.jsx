@@ -89,6 +89,8 @@ export default function Inventory({onPick}) {
   const [agentPassport, setAgentPassport] = useState(null);
   const [selectedScreenshot, setSelectedScreenshot] = useState(null);
   const [activeTab, setActiveTab] = useState('console'); // 'console' | 'history' | 'catalog'
+  const [sessionUser, setSessionUser] = useState(null);
+  const [targetHandle, setTargetHandle] = useState('');
   const resultRef = useRef(null);
 
   // Load execution history
@@ -111,9 +113,21 @@ export default function Inventory({onPick}) {
       .catch(() => {});
   };
 
+  // Load detected active session user
+  const loadSession = () => {
+    api
+      .browserAgentSession?.()
+      .then((data) => {
+        if (data?.user) setSessionUser(data.user);
+        else if (data?.envHandle) setSessionUser({handle: data.envHandle});
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     loadHistory();
     loadPassport();
+    loadSession();
   }, []);
 
   // Handle agent execution
@@ -145,11 +159,16 @@ export default function Inventory({onPick}) {
       const res = await api.runBrowserAgent({
         task: taskPrompt.trim(),
         dryRun,
+        targetHandle: targetHandle.trim() || undefined,
       });
 
       clearTimeout(timer1);
       clearTimeout(timer2);
       clearTimeout(timer3);
+
+      if (res?.authenticatedUser) {
+        setSessionUser(res.authenticatedUser);
+      }
 
       setResult(res);
       loadHistory();
@@ -281,6 +300,49 @@ export default function Inventory({onPick}) {
                 </div>
               </div>
 
+              {/* Connected Account & Target Handle Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-lg bg-white/[0.02] border border-white/10">
+                <div className="flex items-center gap-2.5">
+                  <div className={`h-2.5 w-2.5 rounded-full ${sessionUser?.authenticated ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-medium text-white">
+                        Connected X Account:
+                      </span>
+                      {sessionUser?.handle ? (
+                        <span className="text-xs font-mono font-semibold text-primary">
+                          @{sessionUser.handle}
+                          {sessionUser.displayName && (
+                            <span className="text-muted-foreground font-normal ml-1">
+                              ({sessionUser.displayName})
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-xs font-mono text-muted-foreground">
+                          Auto-detected from active browser session
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">
+                      Universal execution — posts to whoever is currently signed in on this machine.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[11px] font-mono text-muted-foreground">Override @handle:</span>
+                  <Input
+                    type="text"
+                    value={targetHandle}
+                    onChange={(e) => setTargetHandle(e.target.value)}
+                    disabled={running}
+                    placeholder={sessionUser?.handle ? `@${sessionUser.handle}` : "Auto-detect"}
+                    className="h-7 w-36 font-mono text-xs bg-black/50 border-white/15 px-2 py-0 text-white focus-visible:border-primary"
+                  />
+                </div>
+              </div>
+
               {/* Prompt Input Section */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -364,7 +426,7 @@ export default function Inventory({onPick}) {
                     <p className="text-[11px] text-muted-foreground mt-0.5">
                       {dryRun
                         ? 'Navigates, composes draft text, captures screenshot, audits via 0G Compute, and skips final Post click.'
-                        : 'Live execution: Publishes real tweet to @Ayush_2005__ on X, audits profile, and settles on-chain.'}
+                        : `Live execution: Publishes real tweet to @${targetHandle?.replace(/^@/, '') || sessionUser?.handle || 'active X account'} on X, audits profile, and settles on-chain.`}
                     </p>
                   </div>
                 </div>
@@ -493,12 +555,12 @@ export default function Inventory({onPick}) {
                           TASK SUCCEEDED — POST PUBLISHED & VERIFIED ON X
                         </span>
                         <a
-                          href="https://x.com/Ayush_2005__"
+                          href={result.authenticatedUser?.handle ? `https://x.com/${result.authenticatedUser.handle}` : targetHandle ? `https://x.com/${targetHandle.replace(/^@/, '')}` : (sessionUser?.handle ? `https://x.com/${sessionUser.handle}` : "https://x.com")}
                           target="_blank"
                           rel="noreferrer"
                           className="text-emerald-400 hover:text-emerald-300 underline text-xs font-bold inline-flex items-center gap-1"
                         >
-                          View Live on Profile @Ayush_2005__ ↗
+                          View Live on Profile @{result.authenticatedUser?.handle || targetHandle?.replace(/^@/, '') || sessionUser?.handle || 'User'} ↗
                         </a>
                       </div>
                       <p className="text-sm font-sans text-white/90 font-medium">

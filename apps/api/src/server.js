@@ -331,9 +331,30 @@ route('POST', /^\/api\/route$/, async (_req, body) => {
 route('POST', /^\/api\/browser-agent\/run$/, async (_req, body) => {
   const task = (body.task || '').trim() || 'Post about KYA on X';
   const dryRun = body.dryRun !== undefined ? Boolean(body.dryRun) : true;
+  const targetHandle = (body.targetHandle || body.handle || '').trim() || null;
   const {runBrowserAgent} = await import('../../../agents/runtime/browser-agent/index.js');
-  const result = await runBrowserAgent({task, dryRun});
+  const result = await runBrowserAgent({task, dryRun, targetHandle});
   return {ok: true, ...result};
+});
+
+/**
+ * Returns current browser session state and detected user account info.
+ */
+route('GET', /^\/api\/browser-agent\/session$/, async () => {
+  const storagePath = resolve(ROOT, 'agents/runtime/browser-agent/.storage/x-session.json');
+  const infoPath = resolve(ROOT, 'agents/runtime/browser-agent/.storage/session-info.json');
+  const hasSession = existsSync(storagePath);
+  let user = null;
+  if (existsSync(infoPath)) {
+    try {
+      user = JSON.parse(readFileSync(infoPath, 'utf8'));
+    } catch {}
+  }
+  return {
+    authenticated: hasSession,
+    user,
+    envHandle: process.env.X_USER_HANDLE || process.env.TWITTER_HANDLE || null,
+  };
 });
 
 /**
