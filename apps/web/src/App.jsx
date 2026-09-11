@@ -7,6 +7,7 @@ import Compare from './views/Compare.jsx';
 import Relying from './views/Relying.jsx';
 import Sponsors from './views/Sponsors.jsx';
 import Issue from './views/Issue.jsx';
+import Agents from './views/Agents.jsx'
 import {
   IconSearch,
   IconPassport,
@@ -15,10 +16,12 @@ import {
   IconLayers,
   IconPlus,
   IconArrowRight,
+  IconRobot
 } from './components/icons.jsx';
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
+import ScraperAgentView from './views/ScraperAgentViews.jsx';
 
 const VIEWS = [
   {id: 'compare', label: 'Compare', icon: IconScales, key: '1'},
@@ -26,6 +29,8 @@ const VIEWS = [
   {id: 'relying', label: 'Relying app', icon: IconRoute, key: '3'},
   {id: 'issue', label: 'Issue', icon: IconPlus, key: '4'},
   {id: 'sponsors', label: 'Integrations', icon: IconLayers, key: '5'},
+  {id: 'agents', label: 'Agents', icon: IconRobot, key: '6'},
+  {id: 'scraper', label: 'Scraper', icon: IconRobot, key: '7'},
 ];
 
 const ALL = ['home', ...VIEWS.map((v) => v.id)];
@@ -368,6 +373,8 @@ export default function App() {
             {view === 'relying' && <Relying tasks={tasks} onPick={(q) => go('lookup', q)} />}
             {view === 'issue' && <Issue onPick={(q) => go('lookup', q)} integrations={integrations} />}
             {view === 'sponsors' && <Sponsors />}
+            {view === 'agents' && <Agents />}
+            {view === 'scraper' && <ScraperAgentView/>}
           </motion.div>
         </AnimatePresence>
       </main>
